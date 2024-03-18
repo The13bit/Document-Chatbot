@@ -1,0 +1,10 @@
+streamlit
+google-generativeai
+python-dotenv
+langchain
+pyPdf2
+chromadb
+langchain
+langchain-google-genai
+docx2pdf
+pdfminer.six

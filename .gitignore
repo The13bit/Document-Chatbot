@@ -1,0 +1,6 @@
+.vscode
+chroma_Store/*
+!chroma_Store/.gitkeep
+temp_doc/*
+!temp_doc/.gitkeep
+.env
