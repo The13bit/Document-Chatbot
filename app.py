@@ -12,13 +12,13 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from chromadb.config import Settings
 from langchain.chains.question_answering import load_qa_chain
 import hashlib
-
+from langchain.chains import RetrievalQA
 from langchain_community.document_loaders.word_document import Docx2txtLoader
 from io import BytesIO
 load_dotenv()
 TMP_DIRECTORY="./temp_doc"
-VECTOR_DB=Chroma(persist_directory="./chroma_Store", embedding_function=GoogleGenerativeAIEmbeddings(model="models/embedding-001"))
-print(VECTOR_DB._collection.count())
+EMBEDDINGS=GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+DBSTORE="./chroma_Store"
 
 
 
@@ -30,7 +30,8 @@ def LoadVectorDB(hash,chunked_document):
     
 
     
-    collections=client.get_or_create_collection(store_name)
+    client.get_or_create_collection(store_name)
+    
     
 
     
@@ -41,7 +42,7 @@ def LoadVectorDB(hash,chunked_document):
         collection_name=store_name,
         persist_directory="./chroma_Store/"
     )
-    vector_db.persist()
+    
     return vector_db
         
 
@@ -60,9 +61,11 @@ def PdfVectorDB(file):
         f.write(file.getvalue())
     loader=PyPDFium2Loader(tmp_path)
     documents=loader.load()
-    text_splitter=CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    text_splitter=CharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunked_document=text_splitter.split_documents(documents)
-    return LoadVectorDB(hash,chunked_document)
+    vd=LoadVectorDB(hash,chunked_document)
+    return vd
+    
     
 
 
@@ -75,30 +78,39 @@ def DocVectorDB(file):
         f.write(file.getvalue())
     loader=Docx2txtLoader(tmp_path)
     documents=loader.load()
-    text_splitter=CharacterTextSplitter(chunk_size=1000,chunk_overlap=10)
+    text_splitter=CharacterTextSplitter(chunk_size=1000,chunk_overlap=200)
     chunked_document=text_splitter.split_documents(documents)
     return LoadVectorDB(hash,chunked_document)
 
     
 
-def DocQuery(file,query):
+def DocQuery(query):
     
-    vectordb=DocVectorDB(file)
+    #vectordb=DocVectorDB(file)
     agent=DocumnetAgent()
     matched_document=vectordb.similarity_search(query)
-    #print(matched_document)
+    print(matched_document)
     answer=agent.run(input_documents=matched_document,question=query)
     return answer
 
-def PdfQuery(file,query):
+def PdfQuery(query,vec):
+    vec.persist()
     
-    vectordb=PdfVectorDB(file)
-    agent=DocumnetAgent()
-    matching_docs=vectordb.similarity_search(query)
-    print(matching_docs)
+    #vec=Chroma(persist_directory=DBSTORE,embedding_function=EMBEDDINGS)
+    print(vec.get())
+
+    retriver=vec.as_retriever()
+    docs=retriver.get_relevant_documents(query)
+    print(docs)
+    qa_chain =RetrievalQA.from_chain_type(llm=ChatGoogleGenerativeAI(model="gemini-pro",convert_system_message_to_human=True), 
+                                  chain_type="stuff", 
+                                  retriever=retriver, 
+                                  return_source_documents=True)
+
     
-    answer=agent.run(input_documents=matching_docs, question=query)
-    return answer
+    #vectordb=PdfVectorDB(file)
+    
+    return qa_chain(query)
 
 
 
@@ -109,22 +121,29 @@ def main():
         st.write("Made by Anas Fodkar")
     st.header("File Chat Bot")
 
-    file=st.file_uploader(label="Input a file",type=["jpeg","png","pdf","docx"])
+    file=st.file_uploader(label="Input a file",type=["jpeg","png","pdf","docx","odt"])
     
     
     if file:
         
         ext=((file.name).split('.'))[-1]
-        prompt=st.text_input(label="Enter Prompt")
-        if prompt:
+        
+        if st.button(label="Process"):
+            
             if '.'+ext in ['.doc', '.docm', '.docx', '.dot', '.dotm', '.dotx', '.odt', '.rtf', '.txt', '.wps', '.xml', '.xps']:
-
-                resp=DocQuery(file,prompt)
+               if "vecdb" not in st.session_state:
+                    st.session_state.vecdb = DocVectorDB(file)
             else:
 
-                resp=PdfQuery(file,prompt)
+                if "vecdb" not in st.session_state:
+                    st.session_state.vecdb = PdfVectorDB(file)
+        vecdb = st.session_state.vecdb
+        #print(vecdb.get())
+                
         
-        
+        prompt=st.text_input(label="Enter Query")
+        if prompt:
+            resp=PdfQuery(prompt,vecdb)
             st.write(resp)
             prompt=None
 
