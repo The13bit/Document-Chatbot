@@ -87,6 +87,7 @@ def DocVectorDB(file):
 
 
 def PdfQuery(query,vec):
+    
     vec.persist()
     
     #vec=Chroma(persist_directory=DBSTORE,embedding_function=EMBEDDINGS)
@@ -129,6 +130,7 @@ def main():
             else:
 
                 if "vecdb" not in st.session_state:
+                    st.write("PRocessing")
                     st.session_state.vecdb = PdfVectorDB(file)
         if "vecdb" in st.session_state:
             vecdb = st.session_state.vecdb
