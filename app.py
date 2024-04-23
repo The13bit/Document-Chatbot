@@ -15,11 +15,11 @@ import hashlib
 from langchain.chains import RetrievalQA
 from langchain_community.document_loaders.word_document import Docx2txtLoader
 from io import BytesIO
+from langchain.prompts import PromptTemplate
 load_dotenv()
 TMP_DIRECTORY="./temp_doc"
 EMBEDDINGS=GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 DBSTORE="./chroma_Store"
-
 
 
 def LoadVectorDB(hash,chunked_document):
@@ -84,14 +84,7 @@ def DocVectorDB(file):
 
     
 
-def DocQuery(query):
-    
-    #vectordb=DocVectorDB(file)
-    agent=DocumnetAgent()
-    matched_document=vectordb.similarity_search(query)
-    print(matched_document)
-    answer=agent.run(input_documents=matched_document,question=query)
-    return answer
+
 
 def PdfQuery(query,vec):
     vec.persist()
@@ -137,18 +130,20 @@ def main():
 
                 if "vecdb" not in st.session_state:
                     st.session_state.vecdb = PdfVectorDB(file)
-        vecdb = st.session_state.vecdb
-        #print(vecdb.get())
-                
-        
+        if "vecdb" in st.session_state:
+            vecdb = st.session_state.vecdb
+        else:
+            vecdb = None  # or some other default value
+
         prompt=st.text_input(label="Enter Query")
-        if prompt:
+        if prompt and vecdb is not None:
             resp=PdfQuery(prompt,vecdb)
-            st.write(resp)
+            st.write(resp["result"])
             prompt=None
 
 if __name__=="__main__":
     main()
+
 
 
 
